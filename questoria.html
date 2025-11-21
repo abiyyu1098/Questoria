@@ -1,0 +1,1482 @@
+<!doctype html>
+<html lang="id">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Questoria</title>
+  <script src="/_sdk/data_sdk.js"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+  <style>
+    body {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      height: 100%;
+    }
+    html {
+      height: 100%;
+    }
+    .verified-badge {
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.8; }
+    }
+    .math-preview {
+      min-height: 50px;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+    }
+    .math-button {
+      display: inline-block;
+      padding: 6px 10px;
+      margin: 2px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      border: 1px solid rgba(0,0,0,0.2);
+      background-color: white;
+      transition: background-color 0.2s;
+    }
+    .math-button:hover {
+      background-color: rgba(0,0,0,0.05);
+    }
+    .math-symbol-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+      gap: 4px;
+      margin-bottom: 12px;
+    }
+  </style>
+  <style>@view-transition { navigation: auto; }</style>
+ </head>
+ <body class="h-full">
+  <div id="app" class="h-full flex flex-col"></div>
+  <script>
+    const defaultConfig = {
+      background_color: "#f0f4f8",
+      surface_color: "#ffffff",
+      text_color: "#1e293b",
+      primary_action_color: "#3b82f6",
+      secondary_action_color: "#64748b",
+      font_family: "Inter",
+      font_size: 16,
+      platform_title: "Questoria",
+      welcome_message: "Bank Soal & Forum Diskusi Terverifikasi",
+      footer_text: "Platform pembelajaran kolaboratif untuk siswa dan guru"
+    };
+
+    let currentRecordCount = 0;
+    let allData = [];
+    let currentView = 'login';
+    let currentFilter = { subject: 'all', grade: 'all', type: 'all' };
+    let selectedItem = null;
+    let currentUser = null;
+    let selectedAnswer = null;
+
+    // Fungsi untuk render rumus matematika dengan KaTeX
+    function renderMath(element) {
+      if (element && typeof renderMathInElement !== 'undefined') {
+        renderMathInElement(element, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\[', right: '\\]', display: true},
+            {left: '\\(', right: '\\)', display: false}
+          ],
+          throwOnError: false
+        });
+      }
+    }
+
+    // Database guru
+    const teachersDB = [
+      { nomorPiagam: "1234/HGN/001", nama: "Ahmad, S.Pd. M.T." },
+      { nomorPiagam: "1234/HGN/002", nama: "Dra. Siti Aminah" },
+      { nomorPiagam: "1234/HGN/003", nama: "Drs. Bambang Suparto" },
+      { nomorPiagam: "1234/HGN/004", nama: "Drs. Nur Slamet M.Pdi" },
+      { nomorPiagam: "1234/HGN/005", nama: "Budi Triono S.Pd." },
+      { nomorPiagam: "1234/HGN/006", nama: "Iin Winarti S.Pd." },
+      { nomorPiagam: "1234/HGN/007", nama: "Nur Romlah S.Pd." },
+      { nomorPiagam: "1234/HGN/008", nama: "Sunardyah Nugraningsih S.Pd" },
+      { nomorPiagam: "1234/HGN/009", nama: "Zulaihah S.Pd" },
+      { nomorPiagam: "1234/HGN/010", nama: "Titik Tustiani S.Pd." },
+      { nomorPiagam: "1234/HGN/011", nama: "Norhayati S.Pd." },
+      { nomorPiagam: "1234/HGN/012", nama: "Himawati Adiapsari M.Pd" },
+      { nomorPiagam: "1234/HGN/013", nama: "Ida Nurhayati S.Pd." },
+      { nomorPiagam: "1234/HGN/014", nama: "Mu'alim S.Pd. M.Pd" },
+      { nomorPiagam: "1234/HGN/015", nama: "Ihdiyati Nurhayinah S.Pd." },
+      { nomorPiagam: "1234/HGN/016", nama: "Retno Bintarti S.Pd." },
+      { nomorPiagam: "1234/HGN/017", nama: "Drs. Samsudi M.Kp" },
+      { nomorPiagam: "1234/HGN/018", nama: "Zulkifli Zakaria M.Pd" },
+      { nomorPiagam: "1234/HGN/019", nama: "Drs. Hakim Prayitno" },
+      { nomorPiagam: "1234/HGN/020", nama: "Putut Wahyu Widodo S.Pd. M.Pd" },
+      { nomorPiagam: "1234/HGN/021", nama: "Moh. Ali Wardoyo S.Si" },
+      { nomorPiagam: "1234/HGN/022", nama: "Ika Widyastutik S.Pd" },
+      { nomorPiagam: "1234/HGN/023", nama: "Lukmanuddin A.Md" },
+      { nomorPiagam: "1234/HGN/024", nama: "Drs. Didik Eko Iswahjoedi" },
+      { nomorPiagam: "1234/HGN/025", nama: "Fajar Indra Kurniawan M.Kom" },
+      { nomorPiagam: "1234/HGN/026", nama: "Umi Nuril Arifah S.Si." },
+      { nomorPiagam: "1234/HGN/027", nama: "Eka Rekatawati S.Pd." },
+      { nomorPiagam: "1234/HGN/028", nama: "Achmad Rifa'i S.Pd." },
+      { nomorPiagam: "1234/HGN/029", nama: "Linda Widyastutik S.Pd." },
+      { nomorPiagam: "1234/HGN/030", nama: "Indahwati S.Pd." },
+      { nomorPiagam: "1234/HGN/031", nama: "Ismiatur Rodlijana S.Pd." },
+      { nomorPiagam: "1234/HGN/032", nama: "Setyo Wawan A S.Pd M.Pd" },
+      { nomorPiagam: "1234/HGN/033", nama: "Drs. Bambang Efendi M.Pd" },
+      { nomorPiagam: "1234/HGN/034", nama: "Tri Endah Ernawati S.Pd" },
+      { nomorPiagam: "1234/HGN/035", nama: "Siti RahayuM.Pd" },
+      { nomorPiagam: "1234/HGN/036", nama: "Emi Nurwahyuningsih S.Pd.M.Pd" },
+      { nomorPiagam: "1234/HGN/037", nama: "Dwi Mei Endrastutik S.Pd" },
+      { nomorPiagam: "1234/HGN/038", nama: "Praneswi Palupita Sari S.Pd" },
+      { nomorPiagam: "1234/HGN/039", nama: "Kristiawan Dwi Cahyono S.Pd. M.Pdi" },
+      { nomorPiagam: "1234/HGN/040", nama: "Fendy Suhartanto S.Pd" },
+      { nomorPiagam: "1234/HGN/041", nama: "Ratna Damayanti Gita R. S.Pd" },
+      { nomorPiagam: "1234/HGN/042", nama: "Anik Noerachini S.Pd" },
+      { nomorPiagam: "1234/HGN/043", nama: "Jhoni Agustiawan Emadeju S.Pd" },
+      { nomorPiagam: "1234/HGN/044", nama: "Nur Ida Ayu Fitriana S.Pd.I" },
+      { nomorPiagam: "1234/HGN/045", nama: "Yulian Nur H. S.Pd" },
+      { nomorPiagam: "1234/HGN/046", nama: "Danar Ilafi S.Pd" },
+      { nomorPiagam: "1234/HGN/047", nama: "Ika Puspita S.Pd" },
+      { nomorPiagam: "1234/HGN/048", nama: "Herman Shalahuddin S.Pd" },
+      { nomorPiagam: "1234/HGN/049", nama: "Achmad Rif'an Maulana M.Si" },
+      { nomorPiagam: "1234/HGN/050", nama: "Sunariati S.Pd" },
+      { nomorPiagam: "1234/HGN/051", nama: "Fitrya Khoirunnisa S.Pd" },
+      { nomorPiagam: "1234/HGN/052", nama: "Emilda Fajriyah S.P.d" },
+      { nomorPiagam: "1234/HGN/053", nama: "Tantry Padhmasari S.Pd M.Pdi" },
+      { nomorPiagam: "1234/HGN/054", nama: "Ika Widyawati M.Pd" },
+      { nomorPiagam: "1234/HGN/055", nama: "Cynthia Aviva S.Pd" },
+      { nomorPiagam: "1234/HGN/056", nama: "Davin Indra S S.Or" },
+      { nomorPiagam: "1234/HGN/057", nama: "Dra. Zufa Choirunnisak" },
+      { nomorPiagam: "1234/HGN/058", nama: "Achmad sarief Yusuf S.Pd" }
+    ];
+
+    // Database siswa
+    const studentsDB = [
+      { nisn: "0083783567", nis: "8255", nama: "ABIFAEYZA MUHAMMAD DYAURRAHMAN", jenisKelamin: "L", kelas: "XI 3" },
+      { nisn: "0091728583", nis: "8257", nama: "ABIYYU NAUFAL ZAKY ASNAR", jenisKelamin: "L", kelas: "XI 3" },
+      { nisn: "0099761011", nis: "8273", nama: "AISYAH ZAHIRA", jenisKelamin: "P", kelas: "XI 3" },
+      { nisn: "0088428482", nis: "8566", nama: "ALDO VANTINALDO", jenisKelamin: "L", kelas: "XI 3" },
+      { nisn: "0086466737", nis: "8290", nama: "ANANTA PRATAMA", jenisKelamin: "L", kelas: "XI 3" },
+      { nisn: "0091446906", nis: "8296", nama: "ANISAH PRATIWI", jenisKelamin: "P", kelas: "XI 3" },
+      { nisn: "0098035212", nis: "8315", nama: "BACHRALFRIDHO REYSHADIN ILMAN", jenisKelamin: "L", kelas: "XI 3" },
+      { nisn: "0082338777", nis: "8317", nama: "BENI RAIHAN ADRIANSYAH", jenisKelamin: "L", kelas: "XI 3" },
+      { nisn: "0082774116", nis: "8338", nama: "DEA KAHAYA AISHAWA", jenisKelamin: "P", kelas: "XI 3" },
+      { nisn: "0084823408", nis: "8346", nama: "DIRGAHAYU RISKA RAMADANI", jenisKelamin: "P", kelas: "XI 3" },
+      { nisn: "0082585783", nis: "8365", nama: "FAWWAZKA FALAJ WAHANDY", jenisKelamin: "L", kelas: "XI 3" },
+      { nisn: "0091638796", nis: "8374", nama: "GALUH AVRIL DINDA ZASKIA", jenisKelamin: "P", kelas: "XI 3" },
+      { nisn: "0096936303", nis: "8387", nama: "JOSEPH KENZIE SURYA WIJAYA", jenisKelamin: "L", kelas: "XI 3" },
+      { nisn: "0099489989", nis: "8404", nama: "LIVINA MARIA ASHRAEL", jenisKelamin: "P", kelas: "XI 3" },
+      { nisn: "3087864747", nis: "8406", nama: "M. AHNAF RAMADHANI", jenisKelamin: "L", kelas: "XI 3" },
+      { nisn: "3097271004", nis: "8426", nama: "MOCHAMAD NURIL MAHMUDI AL TAZAM BILLAH", jenisKelamin: "L", kelas: "XI 3" },
+      { nisn: "0084516249", nis: "8433", nama: "MOHAMMAD ADAM RAYLIANSYAH", jenisKelamin: "L", kelas: "XI 3" },
+      { nisn: "3094462883", nis: "8439", nama: "MUHAMMAD ALDO RIZQIANSYAH", jenisKelamin: "L", kelas: "XI 3" },
+      { nisn: "0083543923", nis: "8450", nama: "MUHAMMAD HENDRIK.A.P", jenisKelamin: "L", kelas: "XI 3" },
+      { nisn: "3092037254", nis: "8571", nama: "MUHAMMAD IZZULIL HAQ", jenisKelamin: "L", kelas: "XI 3" },
+      { nisn: "0081294718", nis: "8461", nama: "MUHAMMAD SYAUQIL JINAN", jenisKelamin: "L", kelas: "XI 3" },
+      { nisn: "0098353271", nis: "8462", nama: "MUHAMMAD WAHYU AL AKBAR", jenisKelamin: "L", kelas: "XI 3" },
+      { nisn: "0084269423", nis: "8464", nama: "MUKHAMMAD RIZQI YAHYA", jenisKelamin: "L", kelas: "XI 3" },
+      { nisn: "0086900584", nis: "8476", nama: "NAVISYA AURA MADA", jenisKelamin: "P", kelas: "XI 3" },
+      { nisn: "0098832918", nis: "8483", nama: "NESSA ACHDIA MAGDALENA TUNGGADEWI", jenisKelamin: "P", kelas: "XI 3" },
+      { nisn: "0082916573", nis: "8573", nama: "OCTAVIAN AMRULLAH", jenisKelamin: "L", kelas: "XI 3" },
+      { nisn: "0089416926", nis: "8513", nama: "REIVALDIANO BINTANG MAHARDIKA", jenisKelamin: "L", kelas: "XI 3" },
+      { nisn: "3097957493", nis: "8516", nama: "REVANO ARDIANSA PUTRA RAMADANI", jenisKelamin: "L", kelas: "XI 3" },
+      { nisn: "0088558121", nis: "8519", nama: "RIFQI ATHALLAH SYAH", jenisKelamin: "L", kelas: "XI 3" },
+      { nisn: "0097771298", nis: "8522", nama: "RIZA AKBAR ALMUQSITH", jenisKelamin: "L", kelas: "XI 3" },
+      { nisn: "0089515064", nis: "8524", nama: "RIZKI ANDI ABDILLAH", jenisKelamin: "L", kelas: "XI 3" },
+      { nisn: "0094277887", nis: "8530", nama: "SALSA BIEANKA FEBITAMA", jenisKelamin: "P", kelas: "XI 3" },
+      { nisn: "0085605914", nis: "8544", nama: "TIARA VIONA VIRDAUS", jenisKelamin: "P", kelas: "XI 3" },
+      { nisn: "3083123860", nis: "8559", nama: "YOSSI AMRU AT-TAUFIK", jenisKelamin: "L", kelas: "XI 3" },
+      { nisn: "3089907474", nis: "8562", nama: "ZALFA NAIDIA NATASYA", jenisKelamin: "P", kelas: "XI 3" },
+      { nisn: "0099645275", nis: "8576", nama: "ZASKIA FAIDA AZMI", jenisKelamin: "P", kelas: "XI 3" },
+      { nisn: "0089321293", nis: "8258", nama: "ACHMAD FAUZAN DWI GHAZALAH", jenisKelamin: "L", kelas: "XI 4" },
+      { nisn: "0085058565", nis: "8262", nama: "ADINDA LAILATUZ ZUHRO", jenisKelamin: "P", kelas: "XI 4" },
+      { nisn: "0087014573", nis: "8268", nama: "AHMAD ELMAN NAFI GUNARTO", jenisKelamin: "L", kelas: "XI 4" },
+      { nisn: "0099808334", nis: "8292", nama: "ANGGA RIZKY PUTRA SETIAWAN", jenisKelamin: "L", kelas: "XI 4" },
+      { nisn: "0083896453", nis: "8301", nama: "ARKA DAEGAL ATMA JAYA", jenisKelamin: "L", kelas: "XI 4" },
+      { nisn: "0077439775", nis: "8313", nama: "AZIZ AHMAD MUDHAKAR", jenisKelamin: "L", kelas: "XI 4" },
+      { nisn: "3091429397", nis: "8314", nama: "AZLAN RIZQI FEBRIANSYAH", jenisKelamin: "L", kelas: "XI 4" },
+      { nisn: "0089210220", nis: "8319", nama: "BIANCHA VALENCIA ARIFIZANTY.P", jenisKelamin: "P", kelas: "XI 4" },
+      { nisn: "0083322221", nis: "8325", nama: "CATRIN AYU MAHESYA", jenisKelamin: "P", kelas: "XI 4" },
+      { nisn: "0097774703", nis: "8326", nama: "CHALLYSTA ZABANIYAH HOSHI SUSISCO", jenisKelamin: "P", kelas: "XI 4" },
+      { nisn: "0081576245", nis: "8327", nama: "CHAREN VERONICA KUSUMA", jenisKelamin: "P", kelas: "XI 4" },
+      { nisn: "3092551794", nis: "8334", nama: "DAHANA SAIKATZU ALBARIZY", jenisKelamin: "L", kelas: "XI 4" },
+      { nisn: "0087473008", nis: "8337", nama: "DAVIN DWI DARMA", jenisKelamin: "L", kelas: "XI 4" },
+      { nisn: "0086704641", nis: "8341", nama: "DEVANDIO RIDHO AL KHAFIDZ", jenisKelamin: "L", kelas: "XI 4" },
+      { nisn: "0088694571", nis: "8352", nama: "ELFITRI SUGI PRIHATI", jenisKelamin: "P", kelas: "XI 4" },
+      { nisn: "0086585650", nis: "8381", nama: "ISLAUKHA NUZRILIA", jenisKelamin: "P", kelas: "XI 4" },
+      { nisn: "0093374649", nis: "8407", nama: "M. ABYAZ MAULIDI AL BALAWI", jenisKelamin: "L", kelas: "XI 4" },
+      { nisn: "0083100683", nis: "8429", nama: "MOCHAMMAD IBNU AHLUL A'FA", jenisKelamin: "L", kelas: "XI 4" },
+      { nisn: "0088404869", nis: "8435", nama: "MUHAMAD SYIAM SEPTIAN SYAH", jenisKelamin: "L", kelas: "XI 4" },
+      { nisn: "3095256433", nis: "8444", nama: "MUHAMMAD FACHRI AR RASYID", jenisKelamin: "L", kelas: "XI 4" },
+      { nisn: "0088147148", nis: "8447", nama: "MUHAMMAD FATHIR AFZA ANWAR", jenisKelamin: "L", kelas: "XI 4" },
+      { nisn: "3086649848", nis: "8452", nama: "MUHAMMAD IRFAN", jenisKelamin: "L", kelas: "XI 4" },
+      { nisn: "0094250721", nis: "8455", nama: "MUHAMMAD RAGAN ENGGRIYANG", jenisKelamin: "L", kelas: "XI 4" },
+      { nisn: "3092913995", nis: "8456", nama: "MUHAMMAD RIFKY ARIFUDIN", jenisKelamin: "L", kelas: "XI 4" },
+      { nisn: "3098747448", nis: "8458", nama: "MUHAMMAD SATRIA MAULANA", jenisKelamin: "L", kelas: "XI 4" },
+      { nisn: "0091696252", nis: "8471", nama: "NAJWA ANINDYA BILQIS RIZKIYUDIN", jenisKelamin: "P", kelas: "XI 4" },
+      { nisn: "3093228611", nis: "8477", nama: "NAYAKA MAULANA AZKA SYARIF", jenisKelamin: "L", kelas: "XI 4" },
+      { nisn: "0097303103", nis: "8485", nama: "NIKMA FATIHAH OCEAN HANANI", jenisKelamin: "P", kelas: "XI 4" },
+      { nisn: "0088594053", nis: "8493", nama: "NURUS SA'IIDATUL HAQIQI", jenisKelamin: "P", kelas: "XI 4" },
+      { nisn: "0089352499", nis: "8502", nama: "RAFAEL ANGGORO", jenisKelamin: "L", kelas: "XI 4" },
+      { nisn: "0094960648", nis: "8505", nama: "RAHARDIAN PUTRA RAYA ALBANI", jenisKelamin: "L", kelas: "XI 4" },
+      { nisn: "0081917994", nis: "8509", nama: "RASYA ISLAMI HEPPY PRATAMA", jenisKelamin: "L", kelas: "XI 4" },
+      { nisn: "0094667513", nis: "8517", nama: "REZA TANGGUH SAGARA", jenisKelamin: "L", kelas: "XI 4" },
+      { nisn: "0097775783", nis: "8534", nama: "SEVILLA MAHARANI", jenisKelamin: "P", kelas: "XI 4" },
+      { nisn: "0094487050", nis: "8548", nama: "VANIA EKA AMANDA PUTRI", jenisKelamin: "P", kelas: "XI 4" },
+      { nisn: "0089121539", nis: "8553", nama: "WHISNU ADI PRASETYO", jenisKelamin: "L", kelas: "XI 4" }
+    ];
+
+    const dataHandler = {
+      onDataChanged(data) {
+        allData = data;
+        currentRecordCount = data.length;
+        renderApp();
+      }
+    };
+
+    async function initApp() {
+      const result = await window.dataSdk.init(dataHandler);
+      if (!result.isOk) {
+        console.error("Failed to initialize data SDK");
+        return;
+      }
+      renderApp();
+    }
+
+    function renderTeacherLoginView() {
+      const config = window.elementSdk?.config || defaultConfig;
+      const app = document.getElementById('app');
+      const baseSize = config.font_size || defaultConfig.font_size;
+      
+      app.style.backgroundColor = config.background_color || defaultConfig.background_color;
+      app.style.fontFamily = `${config.font_family || defaultConfig.font_family}, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`;
+      
+      app.innerHTML = `
+        <div class="flex items-center justify-center h-full" style="padding: ${baseSize * 2}px;">
+          <div style="width: 100%; max-width: 400px; background-color: ${config.surface_color || defaultConfig.surface_color}; padding: ${baseSize * 3}px; border-radius: ${baseSize}px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div style="text-align: center; margin-bottom: ${baseSize * 2}px;">
+              <h1 style="color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 2}px; font-weight: 700; margin: 0 0 ${baseSize * 0.5}px 0;">Login Guru</h1>
+              <p style="color: ${config.text_color || defaultConfig.text_color}; opacity: 0.7; font-size: ${baseSize * 0.9}px; margin: 0;">Masukkan Nomor Piagam Anda</p>
+            </div>
+
+            <form id="teacherLoginForm">
+              <div style="margin-bottom: ${baseSize * 1.5}px;">
+                <label for="nomorPiagam" style="display: block; color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 0.9}px; font-weight: 600; margin-bottom: ${baseSize * 0.5}px;">Nomor Piagam</label>
+                <input type="text" id="nomorPiagam" required style="width: 100%; background-color: ${config.background_color || defaultConfig.background_color}; color: ${config.text_color || defaultConfig.text_color}; padding: ${baseSize * 0.75}px ${baseSize}px; border-radius: ${baseSize * 0.5}px; border: 2px solid rgba(0,0,0,0.1); font-size: ${baseSize}px;" placeholder="Contoh: 1234/HGN/001">
+              </div>
+
+              <div style="margin-bottom: ${baseSize * 1.5}px;">
+                <label for="passwordTeacher" style="display: block; color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 0.9}px; font-weight: 600; margin-bottom: ${baseSize * 0.5}px;">Password</label>
+                <input type="password" id="passwordTeacher" required style="width: 100%; background-color: ${config.background_color || defaultConfig.background_color}; color: ${config.text_color || defaultConfig.text_color}; padding: ${baseSize * 0.75}px ${baseSize}px; border-radius: ${baseSize * 0.5}px; border: 2px solid rgba(0,0,0,0.1); font-size: ${baseSize}px;" placeholder="Masukkan Password (Nomor Piagam)">
+              </div>
+
+              <div id="errorMessageTeacher" style="display: none; background-color: #fee2e2; color: #dc2626; padding: ${baseSize * 0.75}px ${baseSize}px; border-radius: ${baseSize * 0.5}px; margin-bottom: ${baseSize}px; font-size: ${baseSize * 0.9}px;">
+              </div>
+
+              <button type="submit" id="loginTeacherBtn" style="width: 100%; background-color: ${config.primary_action_color || defaultConfig.primary_action_color}; color: white; padding: ${baseSize}px; border-radius: ${baseSize * 0.5}px; font-size: ${baseSize}px; font-weight: 600; border: none; cursor: pointer;">
+                Masuk sebagai Guru
+              </button>
+            </form>
+
+            <div style="margin-top: ${baseSize * 2}px; text-align: center; padding-top: ${baseSize * 2}px; border-top: 1px solid rgba(0,0,0,0.1);">
+              <button id="backToStudentBtn" style="background-color: ${config.secondary_action_color || defaultConfig.secondary_action_color}; color: white; padding: ${baseSize * 0.75}px ${baseSize * 1.5}px; border-radius: ${baseSize * 0.5}px; font-size: ${baseSize * 0.9}px; font-weight: 600; border: none; cursor: pointer;">
+                ← Kembali ke Login Siswa
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('teacherLoginForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        const nomorPiagam = document.getElementById('nomorPiagam').value.trim();
+        const password = document.getElementById('passwordTeacher').value.trim();
+        const errorMsg = document.getElementById('errorMessageTeacher');
+        
+        const teacher = teachersDB.find(t => t.nomorPiagam === nomorPiagam);
+        
+        if (!teacher) {
+          errorMsg.textContent = 'Nomor Piagam tidak ditemukan!';
+          errorMsg.style.display = 'block';
+          return;
+        }
+        
+        if (password !== nomorPiagam) {
+          errorMsg.textContent = 'Password salah!';
+          errorMsg.style.display = 'block';
+          return;
+        }
+        
+        currentUser = {
+          nama: teacher.nama,
+          nis: nomorPiagam,
+          kelas: 'Semua Kelas',
+          role: 'teacher'
+        };
+        
+        currentView = 'home';
+        renderApp();
+      });
+
+      document.getElementById('backToStudentBtn').addEventListener('click', () => {
+        currentView = 'login';
+        renderApp();
+      });
+    }
+
+    function renderLoginView() {
+      const config = window.elementSdk?.config || defaultConfig;
+      const app = document.getElementById('app');
+      const baseSize = config.font_size || defaultConfig.font_size;
+      
+      app.style.backgroundColor = config.background_color || defaultConfig.background_color;
+      app.style.fontFamily = `${config.font_family || defaultConfig.font_family}, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`;
+      
+      app.innerHTML = `
+        <div class="flex items-center justify-center h-full" style="padding: ${baseSize * 2}px;">
+          <div style="width: 100%; max-width: 400px; background-color: ${config.surface_color || defaultConfig.surface_color}; padding: ${baseSize * 3}px; border-radius: ${baseSize}px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div style="text-align: center; margin-bottom: ${baseSize * 2}px;">
+              <h1 style="color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 2}px; font-weight: 700; margin: 0 0 ${baseSize * 0.5}px 0;">${config.platform_title || defaultConfig.platform_title}</h1>
+              <p style="color: ${config.text_color || defaultConfig.text_color}; opacity: 0.7; font-size: ${baseSize * 0.9}px; margin: 0;">${config.welcome_message || defaultConfig.welcome_message}</p>
+            </div>
+
+            <form id="loginForm">
+              <div style="margin-bottom: ${baseSize * 1.5}px;">
+                <label for="nis" style="display: block; color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 0.9}px; font-weight: 600; margin-bottom: ${baseSize * 0.5}px;">NIS</label>
+                <input type="text" id="nis" required style="width: 100%; background-color: ${config.background_color || defaultConfig.background_color}; color: ${config.text_color || defaultConfig.text_color}; padding: ${baseSize * 0.75}px ${baseSize}px; border-radius: ${baseSize * 0.5}px; border: 2px solid rgba(0,0,0,0.1); font-size: ${baseSize}px;" placeholder="Masukkan NIS Anda">
+              </div>
+
+              <div style="margin-bottom: ${baseSize * 1.5}px;">
+                <label for="password" style="display: block; color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 0.9}px; font-weight: 600; margin-bottom: ${baseSize * 0.5}px;">Password</label>
+                <input type="password" id="password" required style="width: 100%; background-color: ${config.background_color || defaultConfig.background_color}; color: ${config.text_color || defaultConfig.text_color}; padding: ${baseSize * 0.75}px ${baseSize}px; border-radius: ${baseSize * 0.5}px; border: 2px solid rgba(0,0,0,0.1); font-size: ${baseSize}px;" placeholder="Masukkan Password (NIS)">
+              </div>
+
+              <div id="errorMessage" style="display: none; background-color: #fee2e2; color: #dc2626; padding: ${baseSize * 0.75}px ${baseSize}px; border-radius: ${baseSize * 0.5}px; margin-bottom: ${baseSize}px; font-size: ${baseSize * 0.9}px;">
+              </div>
+
+              <button type="submit" id="loginBtn" style="width: 100%; background-color: ${config.primary_action_color || defaultConfig.primary_action_color}; color: white; padding: ${baseSize}px; border-radius: ${baseSize * 0.5}px; font-size: ${baseSize}px; font-weight: 600; border: none; cursor: pointer;">
+                Masuk
+              </button>
+            </form>
+
+            <div style="margin-top: ${baseSize * 2}px; text-align: center; padding-top: ${baseSize * 2}px; border-top: 1px solid rgba(0,0,0,0.1);">
+              <p style="color: ${config.text_color || defaultConfig.text_color}; opacity: 0.6; font-size: ${baseSize * 0.85}px; margin: 0 0 ${baseSize}px 0;">Anda seorang Guru?</p>
+              <button id="teacherLoginBtn" style="background-color: ${config.secondary_action_color || defaultConfig.secondary_action_color}; color: white; padding: ${baseSize * 0.75}px ${baseSize * 1.5}px; border-radius: ${baseSize * 0.5}px; font-size: ${baseSize * 0.9}px; font-weight: 600; border: none; cursor: pointer;">
+                Login sebagai Guru
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('loginForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        const nis = document.getElementById('nis').value.trim();
+        const password = document.getElementById('password').value.trim();
+        const errorMsg = document.getElementById('errorMessage');
+        
+        const student = studentsDB.find(s => s.nis === nis);
+        
+        if (!student) {
+          errorMsg.textContent = 'NIS tidak ditemukan!';
+          errorMsg.style.display = 'block';
+          return;
+        }
+        
+        if (password !== nis) {
+          errorMsg.textContent = 'Password salah!';
+          errorMsg.style.display = 'block';
+          return;
+        }
+        
+        currentUser = {
+          nama: student.nama,
+          nis: student.nis,
+          kelas: student.kelas,
+          role: 'student'
+        };
+        
+        currentView = 'home';
+        renderApp();
+      });
+
+      document.getElementById('teacherLoginBtn').addEventListener('click', () => {
+        currentView = 'teacherLogin';
+        renderApp();
+      });
+    }
+
+    function renderApp() {
+      const config = window.elementSdk?.config || defaultConfig;
+      const app = document.getElementById('app');
+      
+      app.style.backgroundColor = config.background_color || defaultConfig.background_color;
+      app.style.fontFamily = `${config.font_family || defaultConfig.font_family}, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`;
+      
+      const baseSize = config.font_size || defaultConfig.font_size;
+      
+      if (currentView === 'login') {
+        renderLoginView();
+      } else if (currentView === 'teacherLogin') {
+        renderTeacherLoginView();
+      } else if (currentView === 'home') {
+        app.innerHTML = `
+          <div class="flex flex-col h-full">
+            <!-- Header -->
+            <header class="shadow-md" style="background-color: ${config.surface_color || defaultConfig.surface_color}; padding: ${baseSize * 1.5}px ${baseSize * 2}px;">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h1 style="color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 2}px; font-weight: 700; margin: 0;">${config.platform_title || defaultConfig.platform_title}</h1>
+                  <p style="color: ${config.text_color || defaultConfig.text_color}; opacity: 0.7; font-size: ${baseSize * 0.9}px; margin: ${baseSize * 0.3}px 0 0 0;">${config.welcome_message || defaultConfig.welcome_message}</p>
+                </div>
+                <div class="flex items-center gap-4">
+                  <button id="profileBtn" style="text-align: right; background: transparent; border: none; cursor: pointer; padding: ${baseSize * 0.5}px;">
+                    <p style="color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 0.9}px; font-weight: 600; margin: 0;">${currentUser.nama}</p>
+                    <p style="color: ${config.text_color || defaultConfig.text_color}; opacity: 0.6; font-size: ${baseSize * 0.8}px; margin: ${baseSize * 0.2}px 0 0 0;">${currentUser.kelas} • ${currentUser.role === 'teacher' ? 'Guru' : 'Siswa'}</p>
+                  </button>
+                  <button id="addBtn" style="background-color: ${config.primary_action_color || defaultConfig.primary_action_color}; color: white; padding: ${baseSize * 0.75}px ${baseSize * 1.5}px; border-radius: ${baseSize * 0.5}px; font-size: ${baseSize}px; font-weight: 600; border: none; cursor: pointer;">
+                    + Tambah Konten
+                  </button>
+                  <button id="logoutBtn" style="background-color: ${config.secondary_action_color || defaultConfig.secondary_action_color}; color: white; padding: ${baseSize * 0.75}px ${baseSize}px; border-radius: ${baseSize * 0.5}px; font-size: ${baseSize}px; border: none; cursor: pointer;">
+                    Keluar
+                  </button>
+                </div>
+              </div>
+            </header>
+
+            <!-- Filters -->
+            <div style="background-color: ${config.surface_color || defaultConfig.surface_color}; padding: ${baseSize}px ${baseSize * 2}px; border-bottom: 1px solid rgba(0,0,0,0.1);">
+              <div class="flex gap-4 flex-wrap">
+                <select id="typeFilter" style="background-color: ${config.background_color || defaultConfig.background_color}; color: ${config.text_color || defaultConfig.text_color}; padding: ${baseSize * 0.5}px ${baseSize}px; border-radius: ${baseSize * 0.5}px; border: 1px solid rgba(0,0,0,0.1); font-size: ${baseSize * 0.9}px; cursor: pointer;">
+                  <option value="all">Semua Tipe</option>
+                  <option value="question">Pertanyaan</option>
+                  <option value="practice">Soal Latihan</option>
+                </select>
+                <select id="subjectFilter" style="background-color: ${config.background_color || defaultConfig.background_color}; color: ${config.text_color || defaultConfig.text_color}; padding: ${baseSize * 0.5}px ${baseSize}px; border-radius: ${baseSize * 0.5}px; border: 1px solid rgba(0,0,0,0.1); font-size: ${baseSize * 0.9}px; cursor: pointer;">
+                  <option value="all">Semua Mata Pelajaran</option>
+                  <option value="Matematika">Matematika</option>
+                  <option value="Fisika">Fisika</option>
+                  <option value="Kimia">Kimia</option>
+                  <option value="Biologi">Biologi</option>
+                  <option value="Bahasa Indonesia">Bahasa Indonesia</option>
+                  <option value="Bahasa Inggris">Bahasa Inggris</option>
+                  <option value="Sejarah">Sejarah</option>
+                  <option value="Ekonomi">Ekonomi</option>
+                </select>
+                <select id="gradeFilter" style="background-color: ${config.background_color || defaultConfig.background_color}; color: ${config.text_color || defaultConfig.text_color}; padding: ${baseSize * 0.5}px ${baseSize}px; border-radius: ${baseSize * 0.5}px; border: 1px solid rgba(0,0,0,0.1); font-size: ${baseSize * 0.9}px; cursor: pointer;">
+                  <option value="all">Semua Kelas</option>
+                  <option value="10">Kelas 10</option>
+                  <option value="11">Kelas 11</option>
+                  <option value="12">Kelas 12</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Content List -->
+            <main class="flex-1 overflow-y-auto" style="padding: ${baseSize * 2}px;">
+              <div id="contentList" class="space-y-4"></div>
+              ${allData.length === 0 ? `
+                <div class="text-center" style="padding: ${baseSize * 4}px; color: ${config.text_color || defaultConfig.text_color}; opacity: 0.5;">
+                  <p style="font-size: ${baseSize * 1.2}px; margin: 0;">Belum ada konten</p>
+                  <p style="font-size: ${baseSize * 0.9}px; margin: ${baseSize * 0.5}px 0 0 0;">Klik tombol "Tambah Konten" untuk memulai</p>
+                </div>
+              ` : ''}
+            </main>
+
+            <!-- Footer -->
+            <footer style="background-color: ${config.surface_color || defaultConfig.surface_color}; padding: ${baseSize}px ${baseSize * 2}px; border-top: 1px solid rgba(0,0,0,0.1); text-align: center;">
+              <p style="color: ${config.text_color || defaultConfig.text_color}; opacity: 0.6; font-size: ${baseSize * 0.85}px; margin: 0;">${config.footer_text || defaultConfig.footer_text}</p>
+            </footer>
+          </div>
+        `;
+
+        renderContentList();
+        attachHomeEventListeners();
+      } else if (currentView === 'add') {
+        renderAddForm();
+      } else if (currentView === 'detail') {
+        renderDetailView();
+      } else if (currentView === 'profile') {
+        renderProfileView();
+      } else if (currentView === 'answer') {
+        renderAnswerForm();
+      }
+    }
+
+    function renderContentList() {
+      const config = window.elementSdk?.config || defaultConfig;
+      const baseSize = config.font_size || defaultConfig.font_size;
+      const contentList = document.getElementById('contentList');
+      
+      const filtered = allData.filter(item => {
+        if (currentFilter.type !== 'all' && item.type !== currentFilter.type) return false;
+        if (currentFilter.subject !== 'all' && item.subject !== currentFilter.subject) return false;
+        if (currentFilter.grade !== 'all' && item.grade !== currentFilter.grade) return false;
+        return true;
+      });
+
+      if (filtered.length === 0 && allData.length > 0) {
+        contentList.innerHTML = `
+          <div class="text-center" style="padding: ${baseSize * 4}px; color: ${config.text_color || defaultConfig.text_color}; opacity: 0.5;">
+            <p style="font-size: ${baseSize * 1.2}px; margin: 0;">Tidak ada konten yang sesuai filter</p>
+          </div>
+        `;
+        return;
+      }
+
+      contentList.innerHTML = filtered.map(item => `
+        <div class="content-item" data-id="${item.id}" style="background-color: ${config.surface_color || defaultConfig.surface_color}; padding: ${baseSize * 1.5}px; border-radius: ${baseSize * 0.75}px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; transition: transform 0.2s;">
+          <div class="flex items-start justify-between">
+            <div class="flex-1">
+              <div class="flex items-center gap-2 mb-2">
+                <span style="background-color: ${item.type === 'question' ? config.primary_action_color : config.secondary_action_color}; color: white; padding: ${baseSize * 0.25}px ${baseSize * 0.75}px; border-radius: ${baseSize * 0.25}px; font-size: ${baseSize * 0.75}px; font-weight: 600;">
+                  ${item.type === 'question' ? '❓ Pertanyaan' : '📝 Soal Latihan'}
+                </span>
+                ${item.verified ? `<span class="verified-badge" style="background-color: #10b981; color: white; padding: ${baseSize * 0.25}px ${baseSize * 0.75}px; border-radius: ${baseSize * 0.25}px; font-size: ${baseSize * 0.75}px; font-weight: 600;">✓ Terverifikasi</span>` : ''}
+              </div>
+              <h3 class="math-content" style="color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 1.1}px; font-weight: 600; margin: 0 0 ${baseSize * 0.5}px 0;">${item.title}</h3>
+              <p class="math-content" style="color: ${config.text_color || defaultConfig.text_color}; opacity: 0.7; font-size: ${baseSize * 0.9}px; margin: 0 0 ${baseSize}px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.content.substring(0, 100)}${item.content.length > 100 ? '...' : ''}</p>
+              <div class="flex items-center gap-4" style="font-size: ${baseSize * 0.85}px; color: ${config.text_color || defaultConfig.text_color}; opacity: 0.6;">
+                <span>${item.subject} • Kelas ${item.grade}</span>
+                <span>•</span>
+                <span>${item.author} (${item.role === 'teacher' ? 'Guru' : 'Siswa'})</span>
+                <span>•</span>
+                ${item.type === 'question' ? `<span>💬 ${item.answers ? item.answers.split('|||').filter(a => a.trim()).length : 0} jawaban</span>` : ''}
+              </div>
+            </div>
+          </div>
+        </div>
+      `).join('');
+
+      document.querySelectorAll('.content-item').forEach(item => {
+        item.addEventListener('click', function() {
+          const id = this.dataset.id;
+          selectedItem = allData.find(d => d.id === id);
+          currentView = 'detail';
+          renderApp();
+        });
+      });
+
+      // Render matematika di semua elemen dengan class math-content
+      setTimeout(() => {
+        document.querySelectorAll('.math-content').forEach(element => {
+          renderMath(element);
+        });
+      }, 0);
+    }
+
+    function attachHomeEventListeners() {
+      const addBtn = document.getElementById('addBtn');
+      if (addBtn) {
+        addBtn.addEventListener('click', () => {
+          currentView = 'add';
+          renderApp();
+        });
+      }
+
+      const profileBtn = document.getElementById('profileBtn');
+      if (profileBtn) {
+        profileBtn.addEventListener('click', () => {
+          currentView = 'profile';
+          renderApp();
+        });
+      }
+
+      const logoutBtn = document.getElementById('logoutBtn');
+      if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+          currentUser = null;
+          currentView = 'login';
+          renderApp();
+        });
+      }
+
+      const typeFilter = document.getElementById('typeFilter');
+      const subjectFilter = document.getElementById('subjectFilter');
+      const gradeFilter = document.getElementById('gradeFilter');
+
+      if (typeFilter) {
+        typeFilter.value = currentFilter.type;
+        typeFilter.addEventListener('change', (e) => {
+          currentFilter.type = e.target.value;
+          renderContentList();
+        });
+      }
+
+      if (subjectFilter) {
+        subjectFilter.value = currentFilter.subject;
+        subjectFilter.addEventListener('change', (e) => {
+          currentFilter.subject = e.target.value;
+          renderContentList();
+        });
+      }
+
+      if (gradeFilter) {
+        gradeFilter.value = currentFilter.grade;
+        gradeFilter.addEventListener('change', (e) => {
+          currentFilter.grade = e.target.value;
+          renderContentList();
+        });
+      }
+    }
+
+    function renderAddForm() {
+      const config = window.elementSdk?.config || defaultConfig;
+      const app = document.getElementById('app');
+      const baseSize = config.font_size || defaultConfig.font_size;
+
+      app.innerHTML = `
+        <div class="flex flex-col h-full">
+          <header class="shadow-md" style="background-color: ${config.surface_color || defaultConfig.surface_color}; padding: ${baseSize * 1.5}px ${baseSize * 2}px;">
+            <div class="flex items-center gap-4">
+              <button id="backBtn" style="background-color: ${config.secondary_action_color || defaultConfig.secondary_action_color}; color: white; padding: ${baseSize * 0.75}px ${baseSize}px; border-radius: ${baseSize * 0.5}px; font-size: ${baseSize}px; border: none; cursor: pointer;">← Kembali</button>
+              <h1 style="color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 1.5}px; font-weight: 700; margin: 0;">Tambah Konten Baru</h1>
+            </div>
+          </header>
+
+          <main class="flex-1 overflow-y-auto" style="padding: ${baseSize * 2}px;">
+            <div style="max-width: 800px; margin: 0 auto; background-color: ${config.surface_color || defaultConfig.surface_color}; padding: ${baseSize * 2}px; border-radius: ${baseSize * 0.75}px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+              <form id="addForm">
+                <div style="margin-bottom: ${baseSize * 1.5}px;">
+                  <label style="display: block; color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 0.9}px; font-weight: 600; margin-bottom: ${baseSize * 0.5}px;">Tipe Konten</label>
+                  <select id="type" required style="width: 100%; background-color: ${config.background_color || defaultConfig.background_color}; color: ${config.text_color || defaultConfig.text_color}; padding: ${baseSize * 0.75}px ${baseSize}px; border-radius: ${baseSize * 0.5}px; border: 1px solid rgba(0,0,0,0.1); font-size: ${baseSize}px;">
+                    <option value="question">Pertanyaan</option>
+                    <option value="practice">Soal Latihan</option>
+                  </select>
+                </div>
+
+                <div style="margin-bottom: ${baseSize * 1.5}px;">
+                  <label for="title" style="display: block; color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 0.9}px; font-weight: 600; margin-bottom: ${baseSize * 0.5}px;">Judul</label>
+                  <input type="text" id="title" required style="width: 100%; background-color: ${config.background_color || defaultConfig.background_color}; color: ${config.text_color || defaultConfig.text_color}; padding: ${baseSize * 0.75}px ${baseSize}px; border-radius: ${baseSize * 0.5}px; border: 1px solid rgba(0,0,0,0.1); font-size: ${baseSize}px;">
+                </div>
+
+                <div style="margin-bottom: ${baseSize * 1.5}px;">
+                  <label for="content" style="display: block; color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 0.9}px; font-weight: 600; margin-bottom: ${baseSize * 0.5}px;">Konten</label>
+                  
+                  <!-- Toolbar Simbol Matematika -->
+                  <div style="background-color: ${config.background_color || defaultConfig.background_color}; padding: ${baseSize}px; border-radius: ${baseSize * 0.5}px; margin-bottom: ${baseSize * 0.5}px; border: 1px solid rgba(0,0,0,0.1);">
+                    <p style="color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 0.85}px; font-weight: 600; margin: 0 0 ${baseSize * 0.5}px 0;">Simbol Matematika (Klik untuk menyisipkan):</p>
+                    
+                    <div style="margin-bottom: ${baseSize * 0.75}px;">
+                      <p style="color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 0.75}px; opacity: 0.7; margin: 0 0 ${baseSize * 0.5}px 0;">Operasi Dasar:</p>
+                      <div class="math-symbol-grid">
+                        <button type="button" class="math-button" data-symbol="$+$">+</button>
+                        <button type="button" class="math-button" data-symbol="$-$">−</button>
+                        <button type="button" class="math-button" data-symbol="$\\times$">×</button>
+                        <button type="button" class="math-button" data-symbol="$\\div$">÷</button>
+                        <button type="button" class="math-button" data-symbol="$=$">=</button>
+                        <button type="button" class="math-button" data-symbol="$\\neq$">≠</button>
+                        <button type="button" class="math-button" data-symbol="$<$">&lt;</button>
+                        <button type="button" class="math-button" data-symbol="$>$">&gt;</button>
+                        <button type="button" class="math-button" data-symbol="$\\leq$">≤</button>
+                        <button type="button" class="math-button" data-symbol="$\\geq$">≥</button>
+                      </div>
+                    </div>
+
+                    <div style="margin-bottom: ${baseSize * 0.75}px;">
+                      <p style="color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 0.75}px; opacity: 0.7; margin: 0 0 ${baseSize * 0.5}px 0;">Pecahan & Akar:</p>
+                      <div class="math-symbol-grid">
+                        <button type="button" class="math-button" data-symbol="$\\frac{a}{b}$">a/b</button>
+                        <button type="button" class="math-button" data-symbol="$\\sqrt{x}$">√x</button>
+                        <button type="button" class="math-button" data-symbol="$\\sqrt[n]{x}$">ⁿ√x</button>
+                        <button type="button" class="math-button" data-symbol="$x^{n}$">xⁿ</button>
+                        <button type="button" class="math-button" data-symbol="$x_{n}$">xₙ</button>
+                      </div>
+                    </div>
+
+                    <div style="margin-bottom: ${baseSize * 0.75}px;">
+                      <p style="color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 0.75}px; opacity: 0.7; margin: 0 0 ${baseSize * 0.5}px 0;">Huruf Yunani:</p>
+                      <div class="math-symbol-grid">
+                        <button type="button" class="math-button" data-symbol="$\\alpha$">α</button>
+                        <button type="button" class="math-button" data-symbol="$\\beta$">β</button>
+                        <button type="button" class="math-button" data-symbol="$\\gamma$">γ</button>
+                        <button type="button" class="math-button" data-symbol="$\\delta$">δ</button>
+                        <button type="button" class="math-button" data-symbol="$\\theta$">θ</button>
+                        <button type="button" class="math-button" data-symbol="$\\pi$">π</button>
+                        <button type="button" class="math-button" data-symbol="$\\sigma$">σ</button>
+                        <button type="button" class="math-button" data-symbol="$\\omega$">ω</button>
+                      </div>
+                    </div>
+
+                    <div style="margin-bottom: ${baseSize * 0.75}px;">
+                      <p style="color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 0.75}px; opacity: 0.7; margin: 0 0 ${baseSize * 0.5}px 0;">Fungsi Trigonometri:</p>
+                      <div class="math-symbol-grid">
+                        <button type="button" class="math-button" data-symbol="$\\sin$">sin</button>
+                        <button type="button" class="math-button" data-symbol="$\\cos$">cos</button>
+                        <button type="button" class="math-button" data-symbol="$\\tan$">tan</button>
+                        <button type="button" class="math-button" data-symbol="$\\log$">log</button>
+                        <button type="button" class="math-button" data-symbol="$\\ln$">ln</button>
+                      </div>
+                    </div>
+
+                    <div style="margin-bottom: ${baseSize * 0.75}px;">
+                      <p style="color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 0.75}px; opacity: 0.7; margin: 0 0 ${baseSize * 0.5}px 0;">Simbol Lainnya:</p>
+                      <div class="math-symbol-grid">
+                        <button type="button" class="math-button" data-symbol="$\\infty$">∞</button>
+                        <button type="button" class="math-button" data-symbol="$\\pm$">±</button>
+                        <button type="button" class="math-button" data-symbol="$\\sum$">∑</button>
+                        <button type="button" class="math-button" data-symbol="$\\int$">∫</button>
+                        <button type="button" class="math-button" data-symbol="$\\lim$">lim</button>
+                        <button type="button" class="math-button" data-symbol="$\\degree$">°</button>
+                      </div>
+                    </div>
+
+                    <p style="color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 0.75}px; opacity: 0.6; margin: ${baseSize * 0.5}px 0 0 0; font-style: italic;">
+                      Tips: Gunakan $...$ untuk rumus dalam teks, atau $$...$$ untuk rumus di baris terpisah
+                    </p>
+                  </div>
+
+                  <textarea id="content" required rows="6" style="width: 100%; background-color: ${config.background_color || defaultConfig.background_color}; color: ${config.text_color || defaultConfig.text_color}; padding: ${baseSize * 0.75}px ${baseSize}px; border-radius: ${baseSize * 0.5}px; border: 1px solid rgba(0,0,0,0.1); font-size: ${baseSize}px; resize: vertical; font-family: monospace;"></textarea>
+                  
+                  <div style="margin-top: ${baseSize * 0.5}px;">
+                    <p style="color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 0.85}px; font-weight: 600; margin: 0 0 ${baseSize * 0.5}px 0;">Preview:</p>
+                    <div id="mathPreview" class="math-preview" style="background-color: ${config.background_color || defaultConfig.background_color}; color: ${config.text_color || defaultConfig.text_color}; border: 1px solid rgba(0,0,0,0.1);">
+                      <em style="opacity: 0.5;">Preview rumus matematika akan muncul di sini...</em>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex gap-4" style="margin-bottom: ${baseSize * 1.5}px;">
+                  <div class="flex-1">
+                    <label for="subject" style="display: block; color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 0.9}px; font-weight: 600; margin-bottom: ${baseSize * 0.5}px;">Mata Pelajaran</label>
+                    <select id="subject" required style="width: 100%; background-color: ${config.background_color || defaultConfig.background_color}; color: ${config.text_color || defaultConfig.text_color}; padding: ${baseSize * 0.75}px ${baseSize}px; border-radius: ${baseSize * 0.5}px; border: 1px solid rgba(0,0,0,0.1); font-size: ${baseSize}px;">
+                      <option value="Matematika">Matematika</option>
+                      <option value="Fisika">Fisika</option>
+                      <option value="Kimia">Kimia</option>
+                      <option value="Biologi">Biologi</option>
+                      <option value="Bahasa Indonesia">Bahasa Indonesia</option>
+                      <option value="Bahasa Inggris">Bahasa Inggris</option>
+                      <option value="Sejarah">Sejarah</option>
+                      <option value="Ekonomi">Ekonomi</option>
+                    </select>
+                  </div>
+
+                  <div class="flex-1">
+                    <label for="grade" style="display: block; color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 0.9}px; font-weight: 600; margin-bottom: ${baseSize * 0.5}px;">Kelas</label>
+                    <select id="grade" required style="width: 100%; background-color: ${config.background_color || defaultConfig.background_color}; color: ${config.text_color || defaultConfig.text_color}; padding: ${baseSize * 0.75}px ${baseSize}px; border-radius: ${baseSize * 0.5}px; border: 1px solid rgba(0,0,0,0.1); font-size: ${baseSize}px;">
+                      <option value="10">Kelas 10</option>
+                      <option value="11">Kelas 11</option>
+                      <option value="12">Kelas 12</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style="margin-bottom: ${baseSize * 1.5}px;">
+                  <label for="author" style="display: block; color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 0.9}px; font-weight: 600; margin-bottom: ${baseSize * 0.5}px;">Nama Anda</label>
+                  <input type="text" id="author" required value="${currentUser.nama}" readonly style="width: 100%; background-color: ${config.surface_color || defaultConfig.surface_color}; color: ${config.text_color || defaultConfig.text_color}; padding: ${baseSize * 0.75}px ${baseSize}px; border-radius: ${baseSize * 0.5}px; border: 1px solid rgba(0,0,0,0.1); font-size: ${baseSize}px; opacity: 0.7;">
+                </div>
+
+                <div style="margin-bottom: ${baseSize * 1.5}px;">
+                  <label style="display: block; color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 0.9}px; font-weight: 600; margin-bottom: ${baseSize * 0.5}px;">Peran</label>
+                  <input type="text" value="${currentUser.role === 'teacher' ? 'Guru' : 'Siswa'}" readonly style="width: 100%; background-color: ${config.surface_color || defaultConfig.surface_color}; color: ${config.text_color || defaultConfig.text_color}; padding: ${baseSize * 0.75}px ${baseSize}px; border-radius: ${baseSize * 0.5}px; border: 1px solid rgba(0,0,0,0.1); font-size: ${baseSize}px; opacity: 0.7;">
+                  <input type="hidden" id="role" value="${currentUser.role}">
+                </div>
+
+                <div id="loadingIndicator" style="display: none; text-align: center; padding: ${baseSize}px; color: ${config.text_color || defaultConfig.text_color}; opacity: 0.7;">
+                  Menyimpan konten...
+                </div>
+
+                <button type="submit" id="submitBtn" style="width: 100%; background-color: ${config.primary_action_color || defaultConfig.primary_action_color}; color: white; padding: ${baseSize}px; border-radius: ${baseSize * 0.5}px; font-size: ${baseSize}px; font-weight: 600; border: none; cursor: pointer;">
+                  Tambahkan Konten
+                </button>
+              </form>
+            </div>
+          </main>
+        </div>
+      `;
+
+      document.getElementById('backBtn').addEventListener('click', () => {
+        currentView = 'home';
+        renderApp();
+      });
+
+      // Event listener untuk tombol simbol matematika
+      document.querySelectorAll('.math-button').forEach(button => {
+        button.addEventListener('click', () => {
+          const symbol = button.dataset.symbol;
+          const contentTextarea = document.getElementById('content');
+          const start = contentTextarea.selectionStart;
+          const end = contentTextarea.selectionEnd;
+          const text = contentTextarea.value;
+          
+          contentTextarea.value = text.substring(0, start) + symbol + text.substring(end);
+          contentTextarea.focus();
+          
+          const newPos = start + symbol.length;
+          contentTextarea.setSelectionRange(newPos, newPos);
+          
+          updateMathPreview();
+        });
+      });
+
+      // Update preview saat mengetik
+      const contentTextarea = document.getElementById('content');
+      contentTextarea.addEventListener('input', updateMathPreview);
+
+      function updateMathPreview() {
+        const content = document.getElementById('content').value;
+        const preview = document.getElementById('mathPreview');
+        
+        if (content.trim() === '') {
+          preview.innerHTML = '<em style="opacity: 0.5;">Preview rumus matematika akan muncul di sini...</em>';
+        } else {
+          preview.textContent = content;
+          renderMath(preview);
+        }
+      }
+
+      document.getElementById('addForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        if (currentRecordCount >= 999) {
+          const loadingIndicator = document.getElementById('loadingIndicator');
+          loadingIndicator.style.display = 'block';
+          loadingIndicator.textContent = 'Batas maksimal 999 konten telah tercapai. Mohon hapus beberapa konten terlebih dahulu.';
+          loadingIndicator.style.color = '#ef4444';
+          return;
+        }
+
+        const submitBtn = document.getElementById('submitBtn');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = '0.5';
+        loadingIndicator.style.display = 'block';
+
+        const newItem = {
+          id: Date.now().toString(),
+          type: document.getElementById('type').value,
+          title: document.getElementById('title').value,
+          content: document.getElementById('content').value,
+          subject: document.getElementById('subject').value,
+          grade: document.getElementById('grade').value,
+          author: document.getElementById('author').value,
+          authorNis: currentUser.nis,
+          role: document.getElementById('role').value,
+          timestamp: new Date().toISOString(),
+          verified: false,
+          votes: 0,
+          answers: ''
+        };
+
+        const result = await window.dataSdk.create(newItem);
+
+        if (result.isOk) {
+          currentView = 'home';
+          renderApp();
+        } else {
+          loadingIndicator.textContent = 'Gagal menyimpan konten. Silakan coba lagi.';
+          loadingIndicator.style.color = '#ef4444';
+          submitBtn.disabled = false;
+          submitBtn.style.opacity = '1';
+        }
+      });
+    }
+
+    function renderDetailView() {
+      const config = window.elementSdk?.config || defaultConfig;
+      const app = document.getElementById('app');
+      const baseSize = config.font_size || defaultConfig.font_size;
+
+      if (!selectedItem) {
+        currentView = 'home';
+        renderApp();
+        return;
+      }
+
+      app.innerHTML = `
+        <div class="flex flex-col h-full">
+          <header class="shadow-md" style="background-color: ${config.surface_color || defaultConfig.surface_color}; padding: ${baseSize * 1.5}px ${baseSize * 2}px;">
+            <div class="flex items-center justify-between">
+              <button id="backBtn" style="background-color: ${config.secondary_action_color || defaultConfig.secondary_action_color}; color: white; padding: ${baseSize * 0.75}px ${baseSize}px; border-radius: ${baseSize * 0.5}px; font-size: ${baseSize}px; border: none; cursor: pointer;">← Kembali</button>
+              <div class="flex gap-2">
+                ${selectedItem.role === 'teacher' || !selectedItem.verified ? `
+                  <button id="verifyBtn" style="background-color: ${selectedItem.verified ? '#6b7280' : '#10b981'}; color: white; padding: ${baseSize * 0.75}px ${baseSize}px; border-radius: ${baseSize * 0.5}px; font-size: ${baseSize}px; border: none; cursor: pointer;">
+                    ${selectedItem.verified ? '✓ Terverifikasi' : '✓ Verifikasi Guru'}
+                  </button>
+                ` : ''}
+                <button id="deleteBtn" style="background-color: #ef4444; color: white; padding: ${baseSize * 0.75}px ${baseSize}px; border-radius: ${baseSize * 0.5}px; font-size: ${baseSize}px; border: none; cursor: pointer;">🗑️ Hapus</button>
+              </div>
+            </div>
+          </header>
+
+          <main class="flex-1 overflow-y-auto" style="padding: ${baseSize * 2}px;">
+            <div style="max-width: 900px; margin: 0 auto;">
+              <div style="background-color: ${config.surface_color || defaultConfig.surface_color}; padding: ${baseSize * 2}px; border-radius: ${baseSize * 0.75}px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <div class="flex items-center gap-2 mb-4">
+                  <span style="background-color: ${selectedItem.type === 'question' ? config.primary_action_color : config.secondary_action_color}; color: white; padding: ${baseSize * 0.3}px ${baseSize}px; border-radius: ${baseSize * 0.25}px; font-size: ${baseSize * 0.85}px; font-weight: 600;">
+                    ${selectedItem.type === 'question' ? '❓ Pertanyaan' : '📝 Soal Latihan'}
+                  </span>
+                  ${selectedItem.verified ? `<span class="verified-badge" style="background-color: #10b981; color: white; padding: ${baseSize * 0.3}px ${baseSize}px; border-radius: ${baseSize * 0.25}px; font-size: ${baseSize * 0.85}px; font-weight: 600;">✓ Terverifikasi Guru</span>` : ''}
+                </div>
+
+                <h1 class="math-content" style="color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 1.75}px; font-weight: 700; margin: 0 0 ${baseSize}px 0;">${selectedItem.title}</h1>
+
+                <div style="color: ${config.text_color || defaultConfig.text_color}; opacity: 0.6; font-size: ${baseSize * 0.9}px; margin-bottom: ${baseSize * 1.5}px;">
+                  <span>${selectedItem.subject} • Kelas ${selectedItem.grade}</span>
+                  <span style="margin: 0 ${baseSize * 0.5}px;">��</span>
+                  <span>${selectedItem.author} (${selectedItem.role === 'teacher' ? 'Guru' : 'Siswa'})</span>
+                  <span style="margin: 0 ${baseSize * 0.5}px;">•</span>
+                  <span>${new Date(selectedItem.timestamp).toLocaleDateString('id-ID')}</span>
+                </div>
+
+                <div class="math-content" style="color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize}px; line-height: 1.6; white-space: pre-wrap; margin-bottom: ${baseSize * 2}px; padding: ${baseSize * 1.5}px; background-color: ${config.background_color || defaultConfig.background_color}; border-radius: ${baseSize * 0.5}px;">
+                  ${selectedItem.content}
+                </div>
+
+                <div class="flex items-center gap-4">
+                  ${selectedItem.type === 'question' ? `
+                    <button id="answerBtn" style="background-color: ${config.primary_action_color || defaultConfig.primary_action_color}; color: white; padding: ${baseSize * 0.75}px ${baseSize * 1.5}px; border-radius: ${baseSize * 0.5}px; font-size: ${baseSize}px; border: none; cursor: pointer;">
+                      💬 Jawab Pertanyaan
+                    </button>
+                  ` : ''}
+                </div>
+                
+                ${selectedItem.type === 'question' && selectedItem.answers ? `
+                  <div style="margin-top: ${baseSize * 2}px; padding-top: ${baseSize * 2}px; border-top: 2px solid rgba(0,0,0,0.1);">
+                    <h2 style="color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 1.3}px; font-weight: 600; margin: 0 0 ${baseSize * 1.5}px 0;">Jawaban</h2>
+                    ${selectedItem.answers.split('|||').filter(a => a.trim()).map(answer => {
+                      const [authorNis, authorName, answerText, verified, votes = '0'] = answer.split('###');
+                      return `
+                        <div style="background-color: ${config.background_color || defaultConfig.background_color}; padding: ${baseSize * 1.5}px; border-radius: ${baseSize * 0.5}px; margin-bottom: ${baseSize}px; border-left: 4px solid ${verified === 'true' ? '#10b981' : config.primary_action_color || defaultConfig.primary_action_color};">
+                          <div class="flex justify-between items-start" style="margin-bottom: ${baseSize * 0.75}px;">
+                            <div>
+                              <p style="color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 0.9}px; font-weight: 600; margin: 0;">${authorName}</p>
+                              ${verified === 'true' ? `<span style="display: inline-block; margin-top: ${baseSize * 0.3}px; background-color: #10b981; color: white; padding: ${baseSize * 0.2}px ${baseSize * 0.6}px; border-radius: ${baseSize * 0.25}px; font-size: ${baseSize * 0.7}px; font-weight: 600;">✓ Terverifikasi Guru</span>` : ''}
+                            </div>
+                            ${currentUser.role === 'teacher' && verified !== 'true' ? `
+                              <button class="verifyAnswerBtn" data-author-nis="${authorNis}" style="background-color: #10b981; color: white; padding: ${baseSize * 0.5}px ${baseSize}px; border-radius: ${baseSize * 0.25}px; font-size: ${baseSize * 0.8}px; border: none; cursor: pointer;">
+                                ✓ Verifikasi
+                              </button>
+                            ` : ''}
+                          </div>
+                          <p class="math-content" style="color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 0.95}px; line-height: 1.6; white-space: pre-wrap; margin: ${baseSize * 0.75}px 0;">${answerText}</p>
+                          <div style="margin-top: ${baseSize}px; padding-top: ${baseSize}px; border-top: 1px solid rgba(0,0,0,0.1);">
+                            <button class="voteAnswerBtn" data-author-nis="${authorNis}" style="background-color: ${config.primary_action_color || defaultConfig.primary_action_color}; color: white; padding: ${baseSize * 0.5}px ${baseSize}px; border-radius: ${baseSize * 0.25}px; font-size: ${baseSize * 0.85}px; border: none; cursor: pointer; font-weight: 600;">
+                              👍 Vote Jawaban Terbaik (${votes})
+                            </button>
+                          </div>
+                        </div>
+                      `;
+                    }).join('')}
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          </main>
+        </div>
+      `;
+
+      // Render matematika di semua elemen
+      setTimeout(() => {
+        document.querySelectorAll('.math-content').forEach(element => {
+          renderMath(element);
+        });
+      }, 0);
+
+      document.getElementById('backBtn').addEventListener('click', () => {
+        selectedItem = null;
+        currentView = 'home';
+        renderApp();
+      });
+
+      const verifyBtn = document.getElementById('verifyBtn');
+      if (verifyBtn) {
+        verifyBtn.addEventListener('click', async () => {
+          verifyBtn.disabled = true;
+          verifyBtn.style.opacity = '0.5';
+          verifyBtn.textContent = 'Memverifikasi...';
+
+          const updatedItem = { ...selectedItem, verified: !selectedItem.verified };
+          const result = await window.dataSdk.update(updatedItem);
+
+          if (result.isOk) {
+            selectedItem = updatedItem;
+            renderApp();
+          } else {
+            verifyBtn.disabled = false;
+            verifyBtn.style.opacity = '1';
+            verifyBtn.textContent = 'Gagal verifikasi';
+          }
+        });
+      }
+
+      const answerBtn = document.getElementById('answerBtn');
+      if (answerBtn) {
+        answerBtn.addEventListener('click', () => {
+          currentView = 'answer';
+          renderApp();
+        });
+      }
+
+      const verifyAnswerBtns = document.querySelectorAll('.verifyAnswerBtn');
+      verifyAnswerBtns.forEach(btn => {
+        btn.addEventListener('click', async function() {
+          const authorNis = this.dataset.authorNis;
+          this.disabled = true;
+          this.style.opacity = '0.5';
+          this.textContent = 'Memverifikasi...';
+
+          const answersArray = selectedItem.answers.split('|||').filter(a => a.trim());
+          const updatedAnswers = answersArray.map(answer => {
+            const parts = answer.split('###');
+            const [nis, name, text, verified, votes = '0'] = parts;
+            if (nis === authorNis) {
+              return `${nis}###${name}###${text}###true###${votes}`;
+            }
+            return answer;
+          }).join('|||');
+
+          const updatedItem = { ...selectedItem, answers: updatedAnswers };
+          const result = await window.dataSdk.update(updatedItem);
+
+          if (result.isOk) {
+            selectedItem = updatedItem;
+            renderApp();
+          } else {
+            this.disabled = false;
+            this.style.opacity = '1';
+            this.textContent = '✓ Verifikasi';
+          }
+        });
+      });
+
+      const voteAnswerBtns = document.querySelectorAll('.voteAnswerBtn');
+      voteAnswerBtns.forEach(btn => {
+        btn.addEventListener('click', async function() {
+          const authorNis = this.dataset.authorNis;
+          this.disabled = true;
+          this.style.opacity = '0.5';
+          this.textContent = 'Voting...';
+
+          const answersArray = selectedItem.answers.split('|||').filter(a => a.trim());
+          const updatedAnswers = answersArray.map(answer => {
+            const parts = answer.split('###');
+            const [nis, name, text, verified, votes = '0'] = parts;
+            if (nis === authorNis) {
+              const newVotes = parseInt(votes) + 1;
+              return `${nis}###${name}###${text}###${verified}###${newVotes}`;
+            }
+            return answer;
+          }).join('|||');
+
+          const updatedItem = { ...selectedItem, answers: updatedAnswers };
+          const result = await window.dataSdk.update(updatedItem);
+
+          if (result.isOk) {
+            selectedItem = updatedItem;
+            renderApp();
+          } else {
+            this.disabled = false;
+            this.style.opacity = '1';
+            const parts = selectedItem.answers.split('|||').filter(a => a.trim()).find(a => a.startsWith(authorNis));
+            const votes = parts ? parts.split('###')[4] || '0' : '0';
+            this.textContent = `👍 Vote Jawaban Terbaik (${votes})`;
+          }
+        });
+      });
+
+      const deleteBtn = document.getElementById('deleteBtn');
+      if (deleteBtn) {
+        let confirmDelete = false;
+        deleteBtn.addEventListener('click', async () => {
+          if (!confirmDelete) {
+            deleteBtn.textContent = 'Klik lagi untuk konfirmasi';
+            deleteBtn.style.backgroundColor = '#dc2626';
+            confirmDelete = true;
+            setTimeout(() => {
+              if (confirmDelete) {
+                deleteBtn.textContent = '🗑️ Hapus';
+                deleteBtn.style.backgroundColor = '#ef4444';
+                confirmDelete = false;
+              }
+            }, 3000);
+            return;
+          }
+
+          deleteBtn.disabled = true;
+          deleteBtn.style.opacity = '0.5';
+          deleteBtn.textContent = 'Menghapus...';
+
+          const result = await window.dataSdk.delete(selectedItem);
+
+          if (result.isOk) {
+            selectedItem = null;
+            currentView = 'home';
+            renderApp();
+          } else {
+            deleteBtn.disabled = false;
+            deleteBtn.style.opacity = '1';
+            deleteBtn.textContent = 'Gagal hapus';
+          }
+        });
+      }
+    }
+
+    function renderAnswerForm() {
+      const config = window.elementSdk?.config || defaultConfig;
+      const app = document.getElementById('app');
+      const baseSize = config.font_size || defaultConfig.font_size;
+
+      if (!selectedItem) {
+        currentView = 'home';
+        renderApp();
+        return;
+      }
+
+      app.innerHTML = `
+        <div class="flex flex-col h-full">
+          <header class="shadow-md" style="background-color: ${config.surface_color || defaultConfig.surface_color}; padding: ${baseSize * 1.5}px ${baseSize * 2}px;">
+            <div class="flex items-center gap-4">
+              <button id="backBtn" style="background-color: ${config.secondary_action_color || defaultConfig.secondary_action_color}; color: white; padding: ${baseSize * 0.75}px ${baseSize}px; border-radius: ${baseSize * 0.5}px; font-size: ${baseSize}px; border: none; cursor: pointer;">← Kembali</button>
+              <h1 style="color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 1.5}px; font-weight: 700; margin: 0;">Jawab Pertanyaan</h1>
+            </div>
+          </header>
+
+          <main class="flex-1 overflow-y-auto" style="padding: ${baseSize * 2}px;">
+            <div style="max-width: 800px; margin: 0 auto;">
+              <div style="background-color: ${config.surface_color || defaultConfig.surface_color}; padding: ${baseSize * 2}px; border-radius: ${baseSize * 0.75}px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: ${baseSize * 2}px;">
+                <h2 style="color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 1.3}px; font-weight: 600; margin: 0 0 ${baseSize}px 0;">${selectedItem.title}</h2>
+                <p style="color: ${config.text_color || defaultConfig.text_color}; opacity: 0.8; font-size: ${baseSize * 0.95}px; line-height: 1.6; white-space: pre-wrap; margin: 0;">${selectedItem.content}</p>
+              </div>
+
+              <div style="background-color: ${config.surface_color || defaultConfig.surface_color}; padding: ${baseSize * 2}px; border-radius: ${baseSize * 0.75}px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <form id="answerForm">
+                  <div style="margin-bottom: ${baseSize * 1.5}px;">
+                    <label for="answerText" style="display: block; color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 0.9}px; font-weight: 600; margin-bottom: ${baseSize * 0.5}px;">Jawaban Anda</label>
+                    
+                    <!-- Toolbar Simbol Matematika untuk jawaban -->
+                    <div style="background-color: ${config.background_color || defaultConfig.background_color}; padding: ${baseSize * 0.75}px; border-radius: ${baseSize * 0.5}px; margin-bottom: ${baseSize * 0.5}px; border: 1px solid rgba(0,0,0,0.1);">
+                      <p style="color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 0.75}px; font-weight: 600; margin: 0 0 ${baseSize * 0.5}px 0;">Simbol Matematika:</p>
+                      <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                        <button type="button" class="math-button-answer" data-symbol="$\\frac{a}{b}$" style="padding: 4px 8px; font-size: 12px; border: 1px solid rgba(0,0,0,0.2); background: white; border-radius: 4px; cursor: pointer;">a/b</button>
+                        <button type="button" class="math-button-answer" data-symbol="$\\sqrt{x}$" style="padding: 4px 8px; font-size: 12px; border: 1px solid rgba(0,0,0,0.2); background: white; border-radius: 4px; cursor: pointer;">√x</button>
+                        <button type="button" class="math-button-answer" data-symbol="$x^{n}$" style="padding: 4px 8px; font-size: 12px; border: 1px solid rgba(0,0,0,0.2); background: white; border-radius: 4px; cursor: pointer;">xⁿ</button>
+                        <button type="button" class="math-button-answer" data-symbol="$\\times$" style="padding: 4px 8px; font-size: 12px; border: 1px solid rgba(0,0,0,0.2); background: white; border-radius: 4px; cursor: pointer;">×</button>
+                        <button type="button" class="math-button-answer" data-symbol="$\\div$" style="padding: 4px 8px; font-size: 12px; border: 1px solid rgba(0,0,0,0.2); background: white; border-radius: 4px; cursor: pointer;">÷</button>
+                        <button type="button" class="math-button-answer" data-symbol="$\\pi$" style="padding: 4px 8px; font-size: 12px; border: 1px solid rgba(0,0,0,0.2); background: white; border-radius: 4px; cursor: pointer;">π</button>
+                        <button type="button" class="math-button-answer" data-symbol="$\\theta$" style="padding: 4px 8px; font-size: 12px; border: 1px solid rgba(0,0,0,0.2); background: white; border-radius: 4px; cursor: pointer;">θ</button>
+                        <button type="button" class="math-button-answer" data-symbol="$\\alpha$" style="padding: 4px 8px; font-size: 12px; border: 1px solid rgba(0,0,0,0.2); background: white; border-radius: 4px; cursor: pointer;">α</button>
+                        <button type="button" class="math-button-answer" data-symbol="$\\pm$" style="padding: 4px 8px; font-size: 12px; border: 1px solid rgba(0,0,0,0.2); background: white; border-radius: 4px; cursor: pointer;">±</button>
+                        <button type="button" class="math-button-answer" data-symbol="$\\leq$" style="padding: 4px 8px; font-size: 12px; border: 1px solid rgba(0,0,0,0.2); background: white; border-radius: 4px; cursor: pointer;">≤</button>
+                        <button type="button" class="math-button-answer" data-symbol="$\\geq$" style="padding: 4px 8px; font-size: 12px; border: 1px solid rgba(0,0,0,0.2); background: white; border-radius: 4px; cursor: pointer;">≥</button>
+                      </div>
+                    </div>
+
+                    <textarea id="answerText" required rows="8" style="width: 100%; background-color: ${config.background_color || defaultConfig.background_color}; color: ${config.text_color || defaultConfig.text_color}; padding: ${baseSize * 0.75}px ${baseSize}px; border-radius: ${baseSize * 0.5}px; border: 1px solid rgba(0,0,0,0.1); font-size: ${baseSize}px; resize: vertical; font-family: monospace;" placeholder="Tulis jawaban Anda di sini..."></textarea>
+                    
+                    <div style="margin-top: ${baseSize * 0.5}px;">
+                      <p style="color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 0.85}px; font-weight: 600; margin: 0 0 ${baseSize * 0.5}px 0;">Preview:</p>
+                      <div id="answerMathPreview" class="math-preview" style="background-color: ${config.background_color || defaultConfig.background_color}; color: ${config.text_color || defaultConfig.text_color}; border: 1px solid rgba(0,0,0,0.1);">
+                        <em style="opacity: 0.5;">Preview jawaban akan muncul di sini...</em>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div id="loadingIndicator" style="display: none; text-align: center; padding: ${baseSize}px; color: ${config.text_color || defaultConfig.text_color}; opacity: 0.7;">
+                    Menyimpan jawaban...
+                  </div>
+
+                  <button type="submit" id="submitBtn" style="width: 100%; background-color: ${config.primary_action_color || defaultConfig.primary_action_color}; color: white; padding: ${baseSize}px; border-radius: ${baseSize * 0.5}px; font-size: ${baseSize}px; font-weight: 600; border: none; cursor: pointer;">
+                    Kirim Jawaban
+                  </button>
+                </form>
+              </div>
+            </div>
+          </main>
+        </div>
+      `;
+
+      document.getElementById('backBtn').addEventListener('click', () => {
+        currentView = 'detail';
+        renderApp();
+      });
+
+      // Event listener untuk tombol simbol matematika di form jawaban
+      document.querySelectorAll('.math-button-answer').forEach(button => {
+        button.addEventListener('click', () => {
+          const symbol = button.dataset.symbol;
+          const answerTextarea = document.getElementById('answerText');
+          const start = answerTextarea.selectionStart;
+          const end = answerTextarea.selectionEnd;
+          const text = answerTextarea.value;
+          
+          answerTextarea.value = text.substring(0, start) + symbol + text.substring(end);
+          answerTextarea.focus();
+          
+          const newPos = start + symbol.length;
+          answerTextarea.setSelectionRange(newPos, newPos);
+          
+          updateAnswerMathPreview();
+        });
+      });
+
+      // Update preview saat mengetik jawaban
+      const answerTextarea = document.getElementById('answerText');
+      answerTextarea.addEventListener('input', updateAnswerMathPreview);
+
+      function updateAnswerMathPreview() {
+        const content = document.getElementById('answerText').value;
+        const preview = document.getElementById('answerMathPreview');
+        
+        if (content.trim() === '') {
+          preview.innerHTML = '<em style="opacity: 0.5;">Preview jawaban akan muncul di sini...</em>';
+        } else {
+          preview.textContent = content;
+          renderMath(preview);
+        }
+      }
+
+      document.getElementById('answerForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const submitBtn = document.getElementById('submitBtn');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = '0.5';
+        loadingIndicator.style.display = 'block';
+
+        const answerText = document.getElementById('answerText').value;
+        const newAnswer = `${currentUser.nis}###${currentUser.nama}###${answerText}###false###0`;
+        
+        const updatedAnswers = selectedItem.answers ? `${selectedItem.answers}|||${newAnswer}` : newAnswer;
+        const updatedItem = { ...selectedItem, answers: updatedAnswers };
+
+        const result = await window.dataSdk.update(updatedItem);
+
+        if (result.isOk) {
+          selectedItem = updatedItem;
+          currentView = 'detail';
+          renderApp();
+        } else {
+          loadingIndicator.textContent = 'Gagal menyimpan jawaban. Silakan coba lagi.';
+          loadingIndicator.style.color = '#ef4444';
+          submitBtn.disabled = false;
+          submitBtn.style.opacity = '1';
+        }
+      });
+    }
+
+    function renderProfileView() {
+      const config = window.elementSdk?.config || defaultConfig;
+      const app = document.getElementById('app');
+      const baseSize = config.font_size || defaultConfig.font_size;
+
+      // Hitung statistik
+      const userQuestions = allData.filter(item => item.authorNis === currentUser.nis && item.type === 'question');
+      const userPractices = allData.filter(item => item.authorNis === currentUser.nis && item.type === 'practice');
+      
+      let answersGiven = 0;
+      let verifiedAnswers = 0;
+      let totalAnswerVotes = 0;
+      
+      allData.forEach(item => {
+        if (item.answers) {
+          const answersArray = item.answers.split('|||').filter(a => a.trim());
+          answersArray.forEach(answer => {
+            const [authorNis, , , verified, votes = '0'] = answer.split('###');
+            if (authorNis === currentUser.nis) {
+              answersGiven++;
+              totalAnswerVotes += parseInt(votes);
+              if (verified === 'true') {
+                verifiedAnswers++;
+              }
+            }
+          });
+        }
+      });
+
+      app.innerHTML = `
+        <div class="flex flex-col h-full">
+          <header class="shadow-md" style="background-color: ${config.surface_color || defaultConfig.surface_color}; padding: ${baseSize * 1.5}px ${baseSize * 2}px;">
+            <div class="flex items-center gap-4">
+              <button id="backBtn" style="background-color: ${config.secondary_action_color || defaultConfig.secondary_action_color}; color: white; padding: ${baseSize * 0.75}px ${baseSize}px; border-radius: ${baseSize * 0.5}px; font-size: ${baseSize}px; border: none; cursor: pointer;">← Kembali</button>
+              <h1 style="color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 1.5}px; font-weight: 700; margin: 0;">Profil Saya</h1>
+            </div>
+          </header>
+
+          <main class="flex-1 overflow-y-auto" style="padding: ${baseSize * 2}px;">
+            <div style="max-width: 900px; margin: 0 auto;">
+              <!-- Informasi Pengguna -->
+              <div style="background-color: ${config.surface_color || defaultConfig.surface_color}; padding: ${baseSize * 2}px; border-radius: ${baseSize * 0.75}px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: ${baseSize * 2}px;">
+                <div style="text-align: center; padding: ${baseSize * 2}px;">
+                  <div style="width: ${baseSize * 6}px; height: ${baseSize * 6}px; border-radius: 50%; background: linear-gradient(135deg, ${config.primary_action_color || defaultConfig.primary_action_color}, ${config.secondary_action_color || defaultConfig.secondary_action_color}); margin: 0 auto ${baseSize}px; display: flex; align-items: center; justify-content: center; color: white; font-size: ${baseSize * 3}px; font-weight: 700;">
+                    ${currentUser.nama.charAt(0).toUpperCase()}
+                  </div>
+                  <h2 style="color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 1.5}px; font-weight: 700; margin: 0 0 ${baseSize * 0.5}px 0;">${currentUser.nama}</h2>
+                  <p style="color: ${config.text_color || defaultConfig.text_color}; opacity: 0.6; font-size: ${baseSize}px; margin: 0;">${currentUser.kelas} • ${currentUser.role === 'teacher' ? 'Guru' : 'Siswa'}</p>
+                  <p style="color: ${config.text_color || defaultConfig.text_color}; opacity: 0.5; font-size: ${baseSize * 0.9}px; margin: ${baseSize * 0.3}px 0 0 0;">NIS: ${currentUser.nis}</p>
+                </div>
+              </div>
+
+              <!-- Statistik -->
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: ${baseSize}px; margin-bottom: ${baseSize * 2}px;">
+                <div style="background-color: ${config.surface_color || defaultConfig.surface_color}; padding: ${baseSize * 1.5}px; border-radius: ${baseSize * 0.75}px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center;">
+                  <div style="font-size: ${baseSize * 2.5}px; font-weight: 700; color: ${config.primary_action_color || defaultConfig.primary_action_color}; margin-bottom: ${baseSize * 0.5}px;">${userQuestions.length}</div>
+                  <div style="color: ${config.text_color || defaultConfig.text_color}; opacity: 0.7; font-size: ${baseSize * 0.9}px;">Pertanyaan Diajukan</div>
+                </div>
+
+                <div style="background-color: ${config.surface_color || defaultConfig.surface_color}; padding: ${baseSize * 1.5}px; border-radius: ${baseSize * 0.75}px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center;">
+                  <div style="font-size: ${baseSize * 2.5}px; font-weight: 700; color: ${config.primary_action_color || defaultConfig.primary_action_color}; margin-bottom: ${baseSize * 0.5}px;">${answersGiven}</div>
+                  <div style="color: ${config.text_color || defaultConfig.text_color}; opacity: 0.7; font-size: ${baseSize * 0.9}px;">Jawaban Diberikan</div>
+                </div>
+
+                <div style="background-color: ${config.surface_color || defaultConfig.surface_color}; padding: ${baseSize * 1.5}px; border-radius: ${baseSize * 0.75}px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center;">
+                  <div style="font-size: ${baseSize * 2.5}px; font-weight: 700; color: #10b981; margin-bottom: ${baseSize * 0.5}px;">${verifiedAnswers}</div>
+                  <div style="color: ${config.text_color || defaultConfig.text_color}; opacity: 0.7; font-size: ${baseSize * 0.9}px;">Jawaban Terverifikasi</div>
+                </div>
+
+                <div style="background-color: ${config.surface_color || defaultConfig.surface_color}; padding: ${baseSize * 1.5}px; border-radius: ${baseSize * 0.75}px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center;">
+                  <div style="font-size: ${baseSize * 2.5}px; font-weight: 700; color: ${config.secondary_action_color || defaultConfig.secondary_action_color}; margin-bottom: ${baseSize * 0.5}px;">${userPractices.length}</div>
+                  <div style="color: ${config.text_color || defaultConfig.text_color}; opacity: 0.7; font-size: ${baseSize * 0.9}px;">Soal Dibagikan</div>
+                </div>
+
+                <div style="background-color: ${config.surface_color || defaultConfig.surface_color}; padding: ${baseSize * 1.5}px; border-radius: ${baseSize * 0.75}px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center;">
+                  <div style="font-size: ${baseSize * 2.5}px; font-weight: 700; color: ${config.primary_action_color || defaultConfig.primary_action_color}; margin-bottom: ${baseSize * 0.5}px;">${totalAnswerVotes}</div>
+                  <div style="color: ${config.text_color || defaultConfig.text_color}; opacity: 0.7; font-size: ${baseSize * 0.9}px;">Vote Jawaban Terbaik</div>
+                </div>
+              </div>
+
+              <!-- Konten Saya -->
+              ${userQuestions.length > 0 || userPractices.length > 0 ? `
+                <div style="background-color: ${config.surface_color || defaultConfig.surface_color}; padding: ${baseSize * 2}px; border-radius: ${baseSize * 0.75}px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                  <h3 style="color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize * 1.2}px; font-weight: 600; margin: 0 0 ${baseSize * 1.5}px 0;">Konten Saya</h3>
+                  <div id="userContentList"></div>
+                </div>
+              ` : `
+                <div style="background-color: ${config.surface_color || defaultConfig.surface_color}; padding: ${baseSize * 3}px; border-radius: ${baseSize * 0.75}px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center;">
+                  <p style="color: ${config.text_color || defaultConfig.text_color}; opacity: 0.5; font-size: ${baseSize}px; margin: 0;">Anda belum memiliki konten</p>
+                </div>
+              `}
+            </div>
+          </main>
+        </div>
+      `;
+
+      document.getElementById('backBtn').addEventListener('click', () => {
+        currentView = 'home';
+        renderApp();
+      });
+
+      const userContentList = document.getElementById('userContentList');
+      if (userContentList) {
+        const userContent = [...userQuestions, ...userPractices].sort((a, b) => 
+          new Date(b.timestamp) - new Date(a.timestamp)
+        );
+
+        userContentList.innerHTML = userContent.map(item => `
+          <div class="profile-content-item" data-id="${item.id}" style="background-color: ${config.background_color || defaultConfig.background_color}; padding: ${baseSize * 1.25}px; border-radius: ${baseSize * 0.5}px; margin-bottom: ${baseSize}px; cursor: pointer; transition: transform 0.2s;">
+            <div class="flex items-center gap-2 mb-2">
+              <span style="background-color: ${item.type === 'question' ? config.primary_action_color : config.secondary_action_color}; color: white; padding: ${baseSize * 0.2}px ${baseSize * 0.6}px; border-radius: ${baseSize * 0.25}px; font-size: ${baseSize * 0.7}px; font-weight: 600;">
+                ${item.type === 'question' ? '❓ Pertanyaan' : '📝 Soal Latihan'}
+              </span>
+              ${item.verified ? `<span style="background-color: #10b981; color: white; padding: ${baseSize * 0.2}px ${baseSize * 0.6}px; border-radius: ${baseSize * 0.25}px; font-size: ${baseSize * 0.7}px; font-weight: 600;">✓ Terverifikasi</span>` : ''}
+            </div>
+            <h4 style="color: ${config.text_color || defaultConfig.text_color}; font-size: ${baseSize}px; font-weight: 600; margin: 0 0 ${baseSize * 0.5}px 0;">${item.title}</h4>
+            <div style="color: ${config.text_color || defaultConfig.text_color}; opacity: 0.6; font-size: ${baseSize * 0.85}px;">
+              <span>${item.subject} • ${new Date(item.timestamp).toLocaleDateString('id-ID')}</span>
+            </div>
+          </div>
+        `).join('');
+
+        document.querySelectorAll('.profile-content-item').forEach(item => {
+          item.addEventListener('click', function() {
+            const id = this.dataset.id;
+            selectedItem = allData.find(d => d.id === id);
+            currentView = 'detail';
+            renderApp();
+          });
+        });
+      }
+    }
+
+    async function onConfigChange(config) {
+      renderApp();
+    }
+
+    function mapToCapabilities(config) {
+      return {
+        recolorables: [
+          {
+            get: () => config.background_color || defaultConfig.background_color,
+            set: (value) => {
+              config.background_color = value;
+              window.elementSdk.setConfig({ background_color: value });
+            }
+          },
+          {
+            get: () => config.surface_color || defaultConfig.surface_color,
+            set: (value) => {
+              config.surface_color = value;
+              window.elementSdk.setConfig({ surface_color: value });
+            }
+          },
+          {
+            get: () => config.text_color || defaultConfig.text_color,
+            set: (value) => {
+              config.text_color = value;
+              window.elementSdk.setConfig({ text_color: value });
+            }
+          },
+          {
+            get: () => config.primary_action_color || defaultConfig.primary_action_color,
+            set: (value) => {
+              config.primary_action_color = value;
+              window.elementSdk.setConfig({ primary_action_color: value });
+            }
+          },
+          {
+            get: () => config.secondary_action_color || defaultConfig.secondary_action_color,
+            set: (value) => {
+              config.secondary_action_color = value;
+              window.elementSdk.setConfig({ secondary_action_color: value });
+            }
+          }
+        ],
+        borderables: [],
+        fontEditable: {
+          get: () => config.font_family || defaultConfig.font_family,
+          set: (value) => {
+            config.font_family = value;
+            window.elementSdk.setConfig({ font_family: value });
+          }
+        },
+        fontSizeable: {
+          get: () => config.font_size || defaultConfig.font_size,
+          set: (value) => {
+            config.font_size = value;
+            window.elementSdk.setConfig({ font_size: value });
+          }
+        }
+      };
+    }
+
+    function mapToEditPanelValues(config) {
+      return new Map([
+        ["platform_title", config.platform_title || defaultConfig.platform_title],
+        ["welcome_message", config.welcome_message || defaultConfig.welcome_message],
+        ["footer_text", config.footer_text || defaultConfig.footer_text]
+      ]);
+    }
+
+    if (window.elementSdk) {
+      window.elementSdk.init({
+        defaultConfig,
+        onConfigChange,
+        mapToCapabilities,
+        mapToEditPanelValues
+      });
+    }
+
+    initApp();
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9a1c9380c336e77c',t:'MTc2MzY5MDI0NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
